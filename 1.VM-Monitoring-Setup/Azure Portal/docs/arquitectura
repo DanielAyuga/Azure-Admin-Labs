@@ -1,0 +1,300 @@
+1.	Objetivo del proyecto
+Desplegar una máquina virtual en Azure y configurar un sistema básico de monitorización compuesto por:
+  ●	Métricas de rendimiento (CPU, memoria, disco)
+  ●	Eventos del sistema
+  ●	Intentos fallidos de inicio de sesión
+  ●	Alertas automáticas
+  ●	Visualización mediante Workbook
+
+2.	Recursos:
+  ●	Resource Group:
+    rg-vmmon-setup - Contenedor del proyecto
+  ●	Log Analytics Workspace:
+    law-vmmon-setup - Recolección de logs y métricas
+  ●	Virtual Machine:
+    vm-vmmon-01 - Máquina virtual monitorizada
+  ●	Virtual Network:
+    vnet-vmmon-01 - Red donde se alojará la máquina virtual
+  ●	Subnet:
+    subnet-vmmon-01 - Subred donde se alojará la máquina virtual
+  ●	Network Security Group:
+    nsg-vmmon-01 - Seguridad de red
+  ●	Data Collection Rule:
+    dcr-vmmon-logs - Envía métricas y eventos a Log Analytics
+  ●	Workbook:
+    wb-vmmon-01 - Monitorización de las métricas
+  ●	Action Group:
+    ag-vmmon-alerts - Notificaciones de alertas
+  ●	Alerta intentos fallidos:
+    alert-vmmon-law-critical-events - 5 intentos fallidos en 5 min
+  ●	Alerta CPU
+    alert-vmmon-cpu-high - CPU > 80% durante 5 min
+  ●	Alerta Resource Health:
+    alert-vmmon-vm-health - Estado crítico de la VM
+      
+3.	Crear Resource Group y Log Analytics Workspace
+  ●	Portal → Resource groups → Create
+    ○	Subscription: Tu subscripción de pruebas.
+    ○	Name: rg-vmmon-setup
+    ○	Region:Elegir la región donde desplegarás la VM.
+    ○	Review + create -> Create.
+Captura: “01.rg-vmmon-setup.png”
+
+  ●	Portal → Log Analytics workspaces → Create
+    ○	Subscription: Tu suscripción de pruebas.
+    ○	Resource group: rg-vmmon-setup (el que acabamos de crear)
+    ○	Name: law-vmmon-setup
+    ○	Region: Región donde pienses desplegar la máquina virtual (recomendable para pruebas, evitar latencia y gastos de salida de datos a otra región).
+    ○	Create.
+Captura: “02.law-vmmon-setup.png”
+
+4.	Desplegar la VM
+  ●	Portal → Virtual machines → Create → Virtual machine
+  ●	Basics:
+    o	Subscription: 
+    o	Resource group: rg-vmmon-setup
+    o	Virtual machine name: vm-vmmon-01
+    o	Region: La misma en la que has creado Log Analytics Workspace
+    o	Deploy to an Azure Extended Zone
+    o	Availability options: No infrastructure redundancy required
+    o	Security type: Standard
+    o	Image: Windows Server 2022 Datacenter - x64 Gen2
+    o	Administrator account
+    o	Username: Elige un nombre de usuario administrador
+    o	Password: Elige una contraseña segura
+    o	Public inbound ports: None
+Captura: “03_01.vm-vmmon-01.png”
+
+  ●	Networking:
+    o	Virtual network: (new) vnet-vmmon-01
+    o	Subnet: (new) subnet-vmmon-01 (10.0.0.0/26)
+    o	Public IP: (new) vm-vmmon-01-ip
+    o	NIC network security group: Basic (vm-vmmon-01-nsg)
+    o	Public inbound ports: None
+Captura: “03_02.vm-vmmon-01.png”
+
+4.1. Regla NSG:
+  ●	Portal → NSG → vm-vmmon-01-nsg → Inbound security rules → Add
+    ○	Source: My IP address
+    ○	Source IP addresses/CIDR ranges: Saldrá tu IP actual.
+    ○	Source port ranges: *
+    ○	Destination: IP Addresses
+    ○	Destination service tag: IP privada de la máquina virtual (en Azure se hace el DNAT (Dynamic Network Address Translation) a la IP pública)
+    ○	Service: RDP
+    ○	Destination port ranges 3389
+    ○	Protocol: TCP
+    ○	Action: Allow
+    ○	Priority: 1000
+    ○	Name: allow-rdp-myip
+Captura: “04.vm-vmmon-01-nsg.png”
+
+5.	Instalar Azure Monitor Agent y conectar al Workspace
+  ●	Portal → Log Analytics Workspace → Settings → Agents → Data Collection Rules → Create
+  ●	Basics
+    ○	Rule Name: dcr-vmmon-logs
+    ○	Subscription: La misma que para todo el proyecto
+    ○	Resource Group: rg-vmmon-setup
+    ○	Region: Spain Central (la misma que para el Log Analytics Workspace)
+    ○	Platform Type: Windows (depende de la máquina a monitorizar)
+    ○	Data Collection Endpoint: <none>
+Captura: “05_01.dcr-vmmon-logs.png”
+  ●	Resources
+    ○	Add
+    ○	Seleccionamos nuestra VM: vm-vmmon-01
+Captura: “05_02.dcr-vmmon-logs.png”
+  ●	Collect and deliver
+    ○	Add data source (primera regla)
+    ○	Data source
+      ■	Performance Counters
+      ■	Custom
+        ●	\Processor Information(_Total)\% Processor Time
+        ●	\Memory\Available Bytes
+        ●	\LogicalDisk(_Total)\% Free Space
+    ○	Destination
+      ■	Add destination
+      ■	Destination type: Azure Monitor Logs
+      ■	Subscription: Tu suscripción
+      ■	Destination Details: law-vmmon-setup
+Captura: “05_03.dcr-vmmon-logs.png”
+    ○	Add data source (segunda regla)
+    ○	Data source
+      ■	Windows Event Logs
+      ■	Basic
+        ●	Application
+          ○	Critical
+          ○	Error
+          ○	Warning
+        ●	Security
+          ○	Audit success
+          ○	Audit failure
+          System
+          ○	Critical
+          ○	Error
+          ○	Warning
+      ○	Destination
+        ■	Add destination
+        ■	Destination type: Azure Monitor Logs
+        ■	Subscription: Tu suscripción
+        ■	Destination Details: law-vmmon-setup
+Captura: “05_04.dcr-vmmon-logs.png”
+
+6.	Crear Workbook para visualización
+  ●	Portal → Monitor → Workbooks → New → Add → Add query. 
+    1.	Estado de la VM (Heartbeat)
+      ○	Consulta:
+        Heartbeat
+        | summarize LastSeen = max(TimeGenerated)
+      ○	Log Analytics Workspace: Cargar todas las suscripciones (Tu Log Analytics Workspace)
+      ○	Visualización: Set by query (te lo muestra como “Grid”)
+      ○	Done editing
+      ○	Save
+      ○	Title: wb-vmmon-01
+      ○	Subscription: Tu subscripción
+      ○	Resource group: rg-vmmon-setup
+      ○	Location: (Europe) Spain Central
+Captura: “06_01.wb-vmmon-01(heartbeat).png”
+    2.	CPU (Performance Counter)
+      ○	Consulta:
+        Perf
+        | where CounterName == "% Processor Time"
+        | summarize AvgCPU = avg(CounterValue) by bin(TimeGenerated, 5m)
+      ○	Log Analytics Workspace: Cargar todas las suscripciones (Tu Log Analytics Workspace)
+      ○	Visualización: Line chart
+      ○	Done editing
+      ○	Save
+Captura: “06_02.wb-vmmon-01(cpu).png”
+
+    3.	Memoria disponible (Performance Counters)
+      ○	Consulta:
+        Perf
+        | where CounterName == "Available Bytes"
+        | extend AvailableMB = todouble(CounterValue) / 1000000.0
+        | summarize AvgAvailableMB = avg(AvailableMB) by bin(TimeGenerated, 5m)
+        | extend AvgAvailableMB = round(AvgAvailableMB, 2)
+        | render timechart with (ytitle="Available (MBytes)")
+      ○	Log Analytics Workspace: Cargar todas las suscripciones (Tu Log Analytics Workspace)
+      ○	Visualización: Line chart
+      ○	Done editing
+      ○	Save
+Captura: “06_03.wb-vmmon-01(memory).png”
+
+    4.	Espacio en disco (Performance Counters)
+      ○	Consulta:
+        Perf
+        | where CounterName == "% Free Space"
+        | summarize AvgFree = avg(CounterValue) by InstanceName
+      ○	Log Analytics Workspace: Cargar todas las suscripciones (Tu Log Analytics Workspace)
+      ○	Visualización: Bar chart
+      ○	Done editing
+      ○	Save
+Captura: “06_04.wb-vmmon-01(disk).png”
+
+    5.	Eventos críticos y warnings
+      ○	Consulta:
+        Event
+        | where EventLevelName in ("Warning", "Error", "Critical")
+        | summarize count() by EventLevelName
+      ○	Log Analytics Workspace: Cargar todas las suscripciones (Tu Log Analytics Workspace)
+      ○	Visualización: Pie chart
+      ○	Done editing
+      ○	Save
+Captura:  “06_05.wb-vmmon-01(events).png”
+
+7. Configurar alertas
+  7.1. Alerta métrica CPU alta
+   ● Portal → Virtual machines → vm-vmmon-01 → Monitoring → Alerts → Create → Alert rule.
+    ○	Scope: vm-vmmon-01 (al crearlo desde el menú de máquinas virtuales se autocompleta)
+    ○	Condition
+      ■	Threshold type: Static 
+      ■	Aggregation type: Average
+      ■	Value is: Greater than
+      ■	Threshold: 80%
+      ■	Check every: 1 minute
+      ■	Lookback period: 5 minutes
+Captura: “07_01_01.alert-vmmon-cpu-high(condition).png”
+    ○	Actions: Create action group
+      ■	Basics
+        ●	Subscription: Tu subscripción
+        ●	Resource group: rg-vmmon-setup
+        ●	Region: Global
+        ●	Action group name: ag-vmmon-alerts
+        ●	Display name: vmmon-alerts
+Captura: “07_01_02.alert-vmmon-cpu-high(action group_basics).png”
+      ■	Notifications
+        ●	Notification type: Email/SMS message/Push/Voice
+        ●	Name: adminemail
+        ●	Selected: Email
+Captura: “07_01_03.alert-vmmon-cpu-high(action group_notifications).png”
+      ■	Create
+    ○	Details
+      ■	Subscription: Tu subscripción
+      ■	Resource group: rg-vmmon-setup
+      ■	Severity 2 - Warning
+      ■	Alert rule name: alert-vmmon-cpu-high
+      ■	Alert rule description: La CPU de vnet-vmmon-01 es superior al 80%
+Captura: “07_01_04.alert-vmmon-cpu-high(details).png”
+    ○	Create
+
+7.2. Alerta Resource Health
+  ●	Portal → Virtual machines → vm-vmmon-01 → Monitoring → Alerts → Create → Alert rule.
+    ○	Scope: vm-vmmon-01 (al crearlo desde el menú de máquinas virtuales se autocompleta)
+    ○	Condition
+      ■	Signal name: See all signals > Resource health
+      ■	Event status: Active
+      ■	Current resource status: Unavailable
+      ■	Previous resource status: Available
+      ■	Reason type: 3 selected (all)
+Captura: “07_02_01.alert-vmmon-vm-health(condition).png”
+    ○	Actions
+      ■	Select action group: ag-vmmon-alerts
+Captura: “07_02_02.alert-vmmon-vm-health(actions).png”
+    ○	Details
+      ■	Subscription: Tu subscripción
+      ■	Resource group: rg-vmmon-setup
+      ■	Alert rule name: alert-vmmon-vm-health
+      ■	Alert rule description: vm-vmmon-01 no está en servicio
+Captura: “07_02_03.alert-vmmon-vm-health(details).png”
+
+7.3. Alerta inicio de sesión fallidos
+  ●	Portal → Log Analytics Workspace → law-vmmon-setup → Monitoring → Alerts → Create → Alert rule
+    ○	Scope: law-vmmon-setup (al crearlo desde el menú de log analytics workspace se autocompleta)
+    ○	Condition: Custom log search
+      ■	Query type: Aggregated logs
+      ■	Search query:
+        Event
+        | where TimeGenerated > ago(5m)
+        | where EventID == 4625
+        | summarize fails = count() by Computer
+        | where fails >= 5
+      ■	Measure: Table rows
+      ■	Aggregation type: Count
+      ■	Aggregation granularity: 5 minutes
+      ■	Resource ID column: Don't split
+      ■	Threshold type: Static
+      ■	Operator: Greater than
+      ■	Threshold value: 0
+      ■	Frequency of evaluation: 5 minutes
+      ■	Estimated monthly cost $1.50 (USD) 
+      ■	Advanced options
+      ■	Number of violations: 1
+      ■	Evaluation period: 5 minutes (1 aggregated points)
+      ■	Override query time range: 5 minutes
+Captura: “07_03_01.alert-vmmon-law-critical-events(condition).png”
+    ○	Actions
+      ■	Action group name: ag-vmmon-alerts
+Captura: “07_03_02.alert-vmmon-law-critical-events(actions).png”
+    ○	Details
+      ■	Subscription: Tu subscripción
+      ■	Resource group: rg-vmmon-setup
+      ■	Severity 2 - Warning
+      ■	Alert rule name: alert-vmmon-law-critical-events
+      ■	Alert rule description: 5 inicios de sesión fallidos en vm-vmmon-01
+Captura: “07_03_03.alert-vmmon-law-critical-events(actions).png”
+  
+8. Probar las alertas
+8.1. Alerta métrica CPU alta
+  Accede a la vm y desde PowerShell ejecutado como administrador lanza el script “cpu-stress.ps1”(carpeta scripts). Espera 5 minutos.
+8.2. Alerta Resource Health
+  Apaga la máquina virtual (Stop) desde el portal de Azure
+8.3. Alerta inicio de sesión fallidos
+  Accede a la máquina virtual a través de RDP y escribe usuario/contraseña de forma incorrecta 5 veces.
