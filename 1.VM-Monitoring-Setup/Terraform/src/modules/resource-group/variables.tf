@@ -4,7 +4,6 @@ variable "rg_name" {
 }
 
 variable "location" {
-  description = "Región donde se desplegarán los recursos"
+  description = "Región donde se creará el grupo de recursos"
   type        = string
-  default     = "spaincentral"
 }
