@@ -1,28 +1,50 @@
-# VIRTUAL NETWORK
 resource "azurerm_virtual_network" "vnet" {
   name                = var.vnet_name
   address_space       = ["10.0.0.0/24"]
   location            = var.location
-  resource_group_name = var.resource_group_name
+  resource_group_name = var.rg_name
 }
 
-# SUBNET
 resource "azurerm_subnet" "subnet" {
   name                 = var.subnet_name
-  resource_group_name  = var.resource_group_name
+  resource_group_name  = var.rg_name
   virtual_network_name = azurerm_virtual_network.vnet.name
   address_prefixes     = ["10.0.0.0/26"]
 }
 
-# NETWORK SECURITY GROUP
 resource "azurerm_network_security_group" "nsg" {
   name                = var.nsg_name
   location            = var.location
-  resource_group_name = var.resource_group_name
+  resource_group_name = var.rg_name
 }
 
-# NSG → SUBNET ASSOCIATION
-resource "azurerm_subnet_network_security_group_association" "nsg_assoc" {
-  subnet_id                 = azurerm_subnet.subnet.id
+resource "azurerm_network_security_rule" "allowmyip" {
+  name                        = "Allow-My-IP"
+  priority                    = 100
+  direction                   = "Inbound"
+  access                      = "Allow"
+  protocol                    = "*"
+  source_port_range           = "*"
+  destination_port_range      = "*"
+  source_address_prefix       = var.my_public_ip
+  destination_address_prefix  = "*"
+  resource_group_name         = var.rg_name
+  network_security_group_name = azurerm_network_security_group.nsg.name
+}
+
+resource "azurerm_network_interface" "nic" {
+  name                = var.nic_name
+  location            = var.location
+  resource_group_name = var.rg_name
+
+  ip_configuration {
+    name                          = "internal"
+    subnet_id                     = azurerm_subnet.subnet.id
+    private_ip_address_allocation = "Dynamic"
+  }
+}
+
+resource "azurerm_network_interface_security_group_association" "nicnsg" {
+  network_interface_id      = azurerm_network_interface.nic.id
   network_security_group_id = azurerm_network_security_group.nsg.id
 }

@@ -1,6 +1,6 @@
+@"
 # Terraform
 .terraform/
-.terraform.lock.hcl
 *.tfstate
 *.tfstate.*
 crash.log
@@ -19,9 +19,10 @@ secrets.tfvars
 *.zip
 *.log
 
-# IDE
+# IDE / OS
 .vscode/
 .idea/
 *.swp
 .DS_Store
 Thumbs.db
+"@ > .gitignore
