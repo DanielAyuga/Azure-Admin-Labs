@@ -1,0 +1,22 @@
+#Variables de "resource group"
+rg_name      = "rg-vmmon-setup"
+
+#Variables de "networking"
+vnet_name    = "vnet-vmmon-01"
+subnet_name  = "subnet-vmmon-01"
+nsg_name     = "nsg-vmmon-01"
+
+#Variables de "compute"
+vm_name        = "vm-vmmon-01"
+nic_name     = "vm-vmmon-01-nic"
+my_public_ip = "Mi_IP_PUBLICA" #Sustituir antes de despliegue
+
+admin_username = "azureadmin" #Sustituir antes de despliegue
+admin_password = "ContraseñaSegura123!" #Sustituir antes de despliegue
+
+#Variables de"monitoring"
+law_name          = "law-vmmon-01"
+dcr_name          = "dcr-vmmon-01"
+vm_workbook_name  = "wb-vmmon-01"
+action_group_name = "ag-vmmon-01"
+alert_email       = "lab1@ejemplo.com"

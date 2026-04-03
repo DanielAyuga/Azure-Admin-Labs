@@ -1,0 +1,65 @@
+{
+  "version": "Notebook/1.0",
+  "items": [
+    {
+      "type": 1,
+      "content": {
+        "json": {
+          "version": "KqlItem/1.0",
+          "query": "Heartbeat\n| summarize LastSeen = max(TimeGenerated)",
+          "title": "VM Heartbeat",
+          "visualization": "table",
+          "resourceIds": ["${law_id}"]
+        }
+      }
+    },
+    {
+      "type": 1,
+      "content": {
+        "json": {
+          "version": "KqlItem/1.0",
+          "query": "Perf\n| where CounterName == \"% Processor Time\"\n| summarize AvgCPU = avg(CounterValue) by bin(TimeGenerated, 5m)",
+          "title": "CPU Usage (5m avg)",
+          "visualization": "linechart",
+          "resourceIds": ["${law_id}"]
+        }
+      }
+    },
+    {
+      "type": 1,
+      "content": {
+        "json": {
+          "version": "KqlItem/1.0",
+          "query": "Perf\n| where CounterName == \"Available Bytes\"\n| extend AvailableMB = todouble(CounterValue) / 1000000.0\n| summarize AvgAvailableMB = avg(AvailableMB) by bin(TimeGenerated, 5m)\n| extend AvgAvailableMB = round(AvgAvailableMB, 2)",
+          "title": "Available Memory (MB)",
+          "visualization": "linechart",
+          "resourceIds": ["${law_id}"]
+        }
+      }
+    },
+    {
+      "type": 1,
+      "content": {
+        "json": {
+          "version": "KqlItem/1.0",
+          "query": "Perf\n| where CounterName == \"% Free Space\"\n| summarize AvgFree = avg(CounterValue) by InstanceName",
+          "title": "Disk Free Space (%)",
+          "visualization": "barchart",
+          "resourceIds": ["${law_id}"]
+        }
+      }
+    },
+    {
+      "type": 1,
+      "content": {
+        "json": {
+          "version": "KqlItem/1.0",
+          "query": "Event\n| where EventLevelName in (\"Warning\", \"Error\", \"Critical\")\n| summarize count() by EventLevelName",
+          "title": "Critical & Warning Events",
+          "visualization": "piechart",
+          "resourceIds": ["${law_id}"]
+        }
+      }
+    }
+  ]
+}

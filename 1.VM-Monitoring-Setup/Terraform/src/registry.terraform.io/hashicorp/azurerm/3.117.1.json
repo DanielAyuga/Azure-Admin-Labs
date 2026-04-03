@@ -1,0 +1,10 @@
+{
+  "archives": {
+    "windows_amd64": {
+      "hashes": [
+        "h1:Y9J+emydHX7LpJYKdF9Zmng0zcRR86Awm/t28LNzb68="
+      ],
+      "url": "terraform-provider-azurerm_3.117.1_windows_amd64.zip"
+    }
+  }
+}

@@ -1,9 +1,11 @@
+#Llamada a modulo "resource_group"
 module "resource_group" {
   source   = "./modules/resource-group"
   rg_name  = var.rg_name
   location = var.location
 }
 
+#Llamada a modulo "networking"
 module "networking" {
   source              = "./modules/networking"
   rg_name             = module.resource_group.rg_name
@@ -17,6 +19,7 @@ module "networking" {
   my_public_ip        = var.my_public_ip
 }
 
+#Llamada a modulo "compute"
 module "compute" {
   source         = "./modules/compute"
   rg_name        = module.resource_group.rg_name
@@ -30,4 +33,20 @@ module "compute" {
 
   admin_username = var.admin_username
   admin_password = var.admin_password
+}
+
+#Llamada a modulo "monitoring"
+module "monitoring" {
+  source   = "./modules/monitoring"
+  rg_name  = module.resource_group.rg_name
+  location = module.resource_group.rg_location
+
+  vm_id    = module.compute.vm_id
+  vm_name  = var.vm_name
+
+  law_name          = var.law_name
+  dcr_name          = var.dcr_name
+  vm_workbook_name  = var.vm_workbook_name
+  action_group_name = var.action_group_name
+  alert_email       = var.alert_email
 }
