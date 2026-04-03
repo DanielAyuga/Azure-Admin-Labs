@@ -16,3 +16,18 @@ module "networking" {
 
   my_public_ip        = var.my_public_ip
 }
+
+module "compute" {
+  source         = "./modules/compute"
+  rg_name        = module.resource_group.rg_name
+  location       = module.resource_group.rg_location
+
+  subnet_id      = module.networking.subnet_id
+  nsg_id         = module.networking.nsg_id
+
+  nic_name       = var.nic_name
+  vm_name        = var.vm_name
+
+  admin_username = var.admin_username
+  admin_password = var.admin_password
+}

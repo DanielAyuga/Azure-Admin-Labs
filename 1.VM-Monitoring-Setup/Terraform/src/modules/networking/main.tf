@@ -31,20 +31,3 @@ resource "azurerm_network_security_rule" "allowmyip" {
   resource_group_name         = var.rg_name
   network_security_group_name = azurerm_network_security_group.nsg.name
 }
-
-resource "azurerm_network_interface" "nic" {
-  name                = var.nic_name
-  location            = var.location
-  resource_group_name = var.rg_name
-
-  ip_configuration {
-    name                          = "internal"
-    subnet_id                     = azurerm_subnet.subnet.id
-    private_ip_address_allocation = "Dynamic"
-  }
-}
-
-resource "azurerm_network_interface_security_group_association" "nicnsg" {
-  network_interface_id      = azurerm_network_interface.nic.id
-  network_security_group_id = azurerm_network_security_group.nsg.id
-}
